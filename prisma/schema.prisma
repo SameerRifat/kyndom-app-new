@@ -1,0 +1,254 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+    // Further reading:
+    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+    url      = env("DATABASE_URL")
+}
+
+// Necessary for Next auth
+model Account {
+    id                String  @id @default(auto()) @map("_id") @db.ObjectId
+    userId            String  @db.ObjectId
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? // @db.Text
+    access_token      String? // @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? // @db.Text
+    session_state     String?
+    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(auto()) @map("_id") @db.ObjectId
+    sessionToken String   @unique
+    userId       String   @db.ObjectId
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// model User {
+//     id                         String                       @id @default(auto()) @map("_id") @db.ObjectId
+//     name                       String
+//     role                       UserRole                     @default(USER)
+//     email                      String                       @unique
+//     emailVerified              DateTime?
+//     password                   String?
+//     image                      String?
+//     onboarded                  Boolean                      @default(false)
+//     accounts                   Account[]
+//     sessions                   Session[]
+//     subscriptions              Subscription[]
+//     likedTemplates             SocialContentTemplate[]
+//     createdAt                  DateTime                     @default(now())
+//     SocialTextTemplate         SocialTextTemplate[]
+//     SocialContentTemplateImage SocialContentTemplateImage[]
+//     EmailVerificationToken     EmailVerificationToken[]
+// }
+
+model User {
+    id                         String                       @id @default(auto()) @map("_id") @db.ObjectId
+    name                       String
+    role                       UserRole                     @default(USER)
+    email                      String                       @unique
+    emailVerified              DateTime?
+    password                   String?
+    image                      String?
+    onboarded                  Boolean                      @default(false)
+    onboardedName              String?
+    livesIn                    String?
+    buyerOrSellerAgent         String?
+    teamOrSoloAgent            String?
+    brokerageName              String?
+    goal                       String?
+    usingSocialMediaToGenerateLeads String?
+    accounts                   Account[]
+    sessions                   Session[]
+    subscriptions              Subscription[]
+    likedTemplates             SocialContentTemplate[]
+    createdAt                  DateTime                     @default(now())
+    SocialTextTemplate         SocialTextTemplate[]
+    SocialContentTemplateImage SocialContentTemplateImage[]
+    EmailVerificationToken     EmailVerificationToken[]
+}
+
+
+model EmailVerificationToken {
+    id        String         @id @default(auto()) @map("_id") @db.ObjectId
+    type      EmailTokenType
+    token     String
+    expired   Boolean        @default(false)
+    user      User           @relation(fields: [userId], references: [id])
+    userId    String         @db.ObjectId
+    createdAt DateTime       @default(now())
+}
+
+enum EmailTokenType {
+    EMAIL_VERIFICATION
+    FORGOT_PASSWORD
+}
+
+enum UserRole {
+    USER
+    DESIGNER
+    ADMIN
+}
+
+enum StorageObjectType {
+    IMAGE
+    FONT
+}
+
+model Subscription {
+    id                   String                @id @default(auto()) @map("_id") @db.ObjectId
+    status               SubscriptionStatus
+    invoices             SubscriptionInvoice[]
+    tariff               SubscriptionTariff
+    stripeSubscriptionId String?
+    expiresAt            DateTime?
+    createdAt            DateTime              @default(now())
+    user                 User                  @relation(references: [id], fields: [userId])
+    userId               String                @db.ObjectId
+}
+
+enum SubscriptionStatus {
+    ACTIVE
+    PENDING
+    PENDING_CANCELLATION
+    EXPIRED
+}
+
+enum SubscriptionTariff {
+    LIFETIME_SPECIAL
+}
+
+model SubscriptionInvoice {
+    id             String                    @id @default(auto()) @map("_id") @db.ObjectId
+    status         SubscriptionInvoiceStatus
+    subscription   Subscription              @relation(fields: [subscriptionId], references: [id])
+    subscriptionId String                    @db.ObjectId
+    total          Int
+    stripeId       String
+    updatedAt      DateTime?
+    createdAt      DateTime                  @default(now())
+}
+
+enum SubscriptionInvoiceStatus {
+    PAID
+    UNPAID
+}
+
+//Social Content
+model SocialContentTemplate {
+    id              String                       @id @default(auto()) @map("_id") @db.ObjectId
+    category        SocialContentCategory
+    title           String
+    canvaUrl        String?
+    commentsText    String?
+    hashtagText     String?
+    tag             SocialTemplateTag            @relation(fields: [tagId], references: [id])
+    tagId           String                       @db.ObjectId
+    previewImages   SocialContentTemplateImage[]
+    previewImageIds String[]                     @db.ObjectId
+    likedByUsers    User                         @relation(fields: [likedByUserIds], references: [id])
+    likedByUserIds  String[]                     @db.ObjectId
+    releaseDate     DateTime?
+    createdAt       DateTime                     @default(now())
+
+    ContentCalendarStyle   ContentCalendarStyle? @relation(fields: [contentCalendarStyleId], references: [id])
+    contentCalendarStyleId String?               @db.ObjectId
+}
+
+model ContentCalendarStyle {
+    id               String                  @id @default(auto()) @map("_id") @db.ObjectId
+    style            String
+    resourceName     String?
+    resourceUrl      String?
+    contentTemplates SocialContentTemplate[]
+    createdAt        DateTime                @default(now())
+}
+
+model SocialContentTemplateImage {
+    id                      String                @id @default(auto()) @map("_id") @db.ObjectId
+    resourceName            String
+    resourceUrl             String
+    createdBy               User                  @relation(references: [id], fields: [createdById])
+    createdById             String                @db.ObjectId
+    createdAt               DateTime              @default(now())
+    SocialContentTemplate   SocialContentTemplate @relation(fields: [socialContentTemplateId], references: [id])
+    socialContentTemplateId String                @db.ObjectId
+}
+
+model SocialTemplateTag {
+    id                       String                  @id @default(auto()) @map("_id") @db.ObjectId
+    name                     String
+    color                    String
+    createdAt                DateTime                @default(now())
+    SocialContentTemplates   SocialContentTemplate[]
+    socialContentTemplateIds String[]                @db.ObjectId
+    socialTextTemplates      SocialTextTemplate[]
+    socialTextTemplateIds    String[]                @db.ObjectId
+}
+
+enum SocialContentCategory {
+    SOCIAL_MEDIA
+    STORY_TEMPLATES
+    PRINTABLE
+    EMAIL
+    BRANDING
+}
+
+model SocialTextTemplate {
+    id             String             @id @default(auto()) @map("_id") @db.ObjectId
+    category       SocialTextCategory
+    title          String
+    content        String
+    tag            SocialTemplateTag  @relation(fields: [tagId], references: [id])
+    tagId          String             @db.ObjectId
+    likedByUsers   User               @relation(fields: [likedByUserIds], references: [id])
+    likedByUserIds String[]           @db.ObjectId
+    releaseDate    DateTime?
+    createdAt      DateTime           @default(now())
+}
+
+enum SocialTextCategory {
+    STORY_IDEAS
+    REELS_IDEAS
+}
+
+model SocialStrategy {
+    id           String             @id @default(auto()) @map("_id") @db.ObjectId
+    type         SocialStrategyType
+    title        String
+    content      String
+    scheduledFor DateTime
+    createdAt    DateTime           @default(now())
+}
+
+enum SocialStrategyType {
+    INSIGHT
+    STORY
+    ENGAGEMENT
+}
+
+model DashboardMessage {
+    id           String   @id @default(auto()) @map("_id") @db.ObjectId
+    message      String
+    submessage   String?
+    scheduledFor DateTime
+    createdAt    DateTime @default(now())
+}
